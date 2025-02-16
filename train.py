@@ -1,8 +1,4 @@
-'''
-    implement training process for Light CNN
-    @author: Alfred Xiang Wu
-    @date: 2017.07.04
-'''
+
 from __future__ import print_function
 import argparse
 import os

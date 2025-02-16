@@ -1,8 +1,3 @@
-'''
-    implement Light CNN
-    @author: Alfred Xiang Wu
-    @date: 2017.07.04
-'''
 
 import math
 import torch

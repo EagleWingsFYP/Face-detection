@@ -2,18 +2,16 @@ import cv2
 import numpy as np
 import os
 import torch
+import torch.nn as nn
 import torchvision.transforms as transforms
 from light_cnn import LightCNN_29Layers
 from scipy.spatial.distance import cosine
 import pickle
 import time
-import threading
-from queue import Queue
 
 # Load pre-trained model (LightCNN)
-device = torch.device('cpu')  # Force CPU usage
-model = LightCNN_29Layers(num_classes=79077).to(device)
-checkpoint = torch.load('F:\Python Project\LightCNN\LightCNN_29Layers_V2_checkpoint.pth', map_location=device)
+model = LightCNN_29Layers(num_classes=79077)
+checkpoint = torch.load('F:\Python Project\LightCNN\LightCNN_29Layers_checkpoint.pth', map_location=torch.device('cpu'))
 state_dict = checkpoint['state_dict']
 state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
 model.load_state_dict(state_dict)
@@ -21,12 +19,12 @@ model.eval()
 
 # Load feature database (features and labels)
 feature_db = {}  # {person_name: [feature_vectors]}
-feature_dir = 'D:/Drone/LightCNN/extracted_features/'
+feature_dir = 'F:\Python Project\LightCNN\extracted_features/'
 
 # Read all .feat files and load features
 for folder in os.listdir(feature_dir):
     person_dir = os.path.join(feature_dir, folder)
-    if os.path.isdir(person_dir):
+    if os.path.isdir(person_dir):  # Process only directories
         feature_db[folder] = []
         for file in os.listdir(person_dir):
             if file.endswith('.feat'):
@@ -41,12 +39,13 @@ def extract_face_features(img):
     """Extract features from a single face."""
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
     img = cv2.resize(img, (128, 128))  # Resize to 128x128
-    img_tensor = transform(img).unsqueeze(0).to(device)  # Add batch dimension
+    img = np.reshape(img, (128, 128, 1))  # Reshape to match the model input
+    img_tensor = transform(img).unsqueeze(0)  # Add batch dimension
     with torch.no_grad():  # Disable gradients for inference
         features = model(img_tensor)
-    return features[1].data.numpy()[0]
+    return features[1].data.cpu().numpy()[0]
 
-# Face detection using Haar Cascade
+# Face detection using Haar Cascade (with optimizations)
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 def recognize_face(frame):
@@ -95,42 +94,25 @@ def recognize_face(frame):
 
     return frame
 
-# Threaded frame processing
-frame_queue = Queue(maxsize=2)
-result_queue = Queue(maxsize=2)
-
-def process_frames():
-    while True:
-        frame = frame_queue.get()
-        result_frame = recognize_face(frame)
-        result_queue.put(result_frame)
-
-
-def display_frames():
-    while True:
-        result_frame = result_queue.get()
-        cv2.imshow('Face Recognition', result_frame)
-
-# Start threads
-processing_thread = threading.Thread(target=process_frames, daemon=True)
-processing_thread.start()
-
-display_thread = threading.Thread(target=display_frames, daemon=True)
-display_thread.start()
-
-# Use your phone's IP camera stream
-phone_camera_url = 'http://192.168.0.104:4747/video'
-cap = cv2.VideoCapture(phone_camera_url)
+# Real-time face recognition from webcam
+cap = cv2.VideoCapture(0)  # 0 is the default webcam
 
 while True:
     ret, frame = cap.read()
     if not ret:
-        print("Failed to capture frame. Check the IP camera stream URL.")
         break
 
-    # Add the frame to the processing queue
-    if not frame_queue.full():
-        frame_queue.put(frame)
+    # Recognize faces in the frame
+    start_time = time.time()
+    frame = recognize_face(frame)
+    end_time = time.time()
+
+    # Display the result
+    cv2.imshow('Face Recognition', frame)
+
+    # Print FPS (frames per second)
+    fps = 1 / (end_time - start_time)
+    print(f"FPS: {fps:.2f}")
 
     if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to exit
         break
