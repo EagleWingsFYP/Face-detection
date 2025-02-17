@@ -1,4 +1,3 @@
-
 from __future__ import print_function
 import argparse
 import os
@@ -12,18 +11,19 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
-import torchvision.datasets as datasets
 
 import numpy as np
 
+# Import the LightCNN model definitions from light_cnn.py
 from light_cnn import LightCNN_9Layers, LightCNN_29Layers, LightCNN_29Layers_v2
+# Import the ImageList dataset from load_imglist.py
 from load_imglist import ImageList
 
 parser = argparse.ArgumentParser(description='PyTorch Light CNN Training')
 parser.add_argument('--arch', '-a', metavar='ARCH', default='LightCNN')
 parser.add_argument('--cuda', '-c', default=True)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
-                    help='number of data loading workers (default: 16)')
+                    help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=80, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
@@ -39,11 +39,11 @@ parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
 parser.add_argument('--print-freq', '-p', default=100, type=int,
                     metavar='N', help='print frequency (default: 100)')
 parser.add_argument('--model', default='', type=str, metavar='Model',
-                    help='model type: LightCNN-9, LightCNN-29, LightCNN-29v2')
+                    help='model type: LightCNN-9, LightCNN-29, or LightCNN-29v2')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--root_path', default='', type=str, metavar='PATH',
-                    help='path to root path of images (default: none)')
+                    help='path to root directory of images (default: none)')
 parser.add_argument('--train_list', default='', type=str, metavar='PATH',
                     help='path to training list (default: none)')
 parser.add_argument('--val_list', default='', type=str, metavar='PATH',
@@ -53,11 +53,17 @@ parser.add_argument('--save_path', default='', type=str, metavar='PATH',
 parser.add_argument('--num_classes', default=99891, type=int,
                     metavar='N', help='number of classes (default: 99891)')
 
+# New arguments for exporting a standalone model
+parser.add_argument('--export', action='store_true',
+                    help='Export model as a standalone TorchScript model for inference')
+parser.add_argument('--export_path', default='standalone_model.pt', type=str,
+                    help='Path to save the exported standalone model')
+
 def main():
     global args
     args = parser.parse_args()
 
-    # create Light CNN for face recognition
+    # Create the LightCNN model for face recognition
     if args.model == 'LightCNN-9':
         model = LightCNN_9Layers(num_classes=args.num_classes)
     elif args.model == 'LightCNN-29':
@@ -65,32 +71,35 @@ def main():
     elif args.model == 'LightCNN-29v2':
         model = LightCNN_29Layers_v2(num_classes=args.num_classes)
     else:
-        print('Error model type\n')
+        print('Error: Invalid model type. Please choose from LightCNN-9, LightCNN-29, or LightCNN-29v2\n')
+        return
 
-    if args.cuda:
+    if args.cuda and torch.cuda.is_available():
         model = torch.nn.DataParallel(model).cuda()
+    else:
+        print("Running on CPU because CUDA is not available or not enabled.")
 
     print(model)
 
-    # large lr for last fc parameters
+    # Setup optimizer with adjusted learning rates for different parameter groups
     params = []
     for name, value in model.named_parameters():
         if 'bias' in name:
             if 'fc2' in name:
-                params += [{'params':value, 'lr': 20 * args.lr, 'weight_decay': 0}]
+                params += [{'params': value, 'lr': 20 * args.lr, 'weight_decay': 0}]
             else:
-                params += [{'params':value, 'lr': 2 * args.lr, 'weight_decay': 0}]
+                params += [{'params': value, 'lr': 2 * args.lr, 'weight_decay': 0}]
         else:
             if 'fc2' in name:
-                params += [{'params':value, 'lr': 10 * args.lr}]
+                params += [{'params': value, 'lr': 10 * args.lr}]
             else:
-                params += [{'params':value, 'lr': 1 * args.lr}]
+                params += [{'params': value, 'lr': 1 * args.lr}]
 
     optimizer = torch.optim.SGD(params, args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
 
-    # optionally resume from a checkpoint
+    # Optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
@@ -104,51 +113,56 @@ def main():
 
     cudnn.benchmark = True
 
-    #load image
+    # Load datasets using the ImageList class from load_imglist.py
     train_loader = torch.utils.data.DataLoader(
         ImageList(root=args.root_path, fileList=args.train_list, 
-            transform=transforms.Compose([ 
-                transforms.RandomCrop(128),
-                transforms.RandomHorizontalFlip(), 
-                transforms.ToTensor(),
-            ])),
+                  transform=transforms.Compose([ 
+                      transforms.RandomCrop(128),
+                      transforms.RandomHorizontalFlip(), 
+                      transforms.ToTensor(),
+                  ])),
         batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(
         ImageList(root=args.root_path, fileList=args.val_list, 
-            transform=transforms.Compose([ 
-                transforms.CenterCrop(128),
-                transforms.ToTensor(),
-            ])),
+                  transform=transforms.Compose([ 
+                      transforms.CenterCrop(128),
+                      transforms.ToTensor(),
+                  ])),
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)   
 
-    # define loss function and optimizer
+    # Define loss function
     criterion = nn.CrossEntropyLoss()
-
     if args.cuda:
-        criterion.cuda()
+        criterion = criterion.cuda()
 
+    # Evaluate before training
     validate(val_loader, model, criterion)    
 
+    # Main training loop
     for epoch in range(args.start_epoch, args.epochs):
-
         adjust_learning_rate(optimizer, epoch)
 
-        # train for one epoch
+        # Train for one epoch
         train(train_loader, model, criterion, optimizer, epoch)
 
-        # evaluate on validation set
+        # Evaluate on the validation set
         prec1 = validate(val_loader, model, criterion)
 
-        save_name = args.save_path + 'lightCNN_' + str(epoch+1) + '_checkpoint.pth.tar'
+        save_name = os.path.join(args.save_path, 'lightCNN_' + str(epoch+1) + '_checkpoint.pth.tar')
         save_checkpoint({
             'epoch': epoch + 1,
             'arch': args.arch,
             'state_dict': model.state_dict(),
             'prec1': prec1,
         }, save_name)
+
+    # Export the standalone model if requested
+    if args.export:
+        export_standalone_model(model, args.export_path)
+        print("Standalone model exported to {}".format(args.export_path))
 
 
 def train(train_loader, model, criterion, optimizer, epoch):
@@ -164,27 +178,22 @@ def train(train_loader, model, criterion, optimizer, epoch):
     for i, (input, target) in enumerate(train_loader):
         data_time.update(time.time() - end)
 
-        input      = input.cuda()
-        target     = target.cuda()
-        input_var  = torch.autograd.Variable(input)
-        target_var = torch.autograd.Variable(target)
+        input  = input.cuda()
+        target = target.cuda()
+        # Compute output and loss
+        output, _ = model(input)
+        loss = criterion(output, target)
 
-        # compute output
-        output, _ = model(input_var)
-        loss   = criterion(output, target_var)
-
-        # measure accuracy and record loss
-        prec1, prec5 = accuracy(output.data, target, topk=(1,5))
-        losses.update(loss.data[0], input.size(0))
+        # Measure accuracy and record loss
+        prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+        losses.update(loss.item(), input.size(0))
         top1.update(prec1[0], input.size(0))
         top5.update(prec5[0], input.size(0))
 
-        # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
@@ -198,43 +207,41 @@ def train(train_loader, model, criterion, optimizer, epoch):
                    epoch, i, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=losses, top1=top1, top5=top5))
 
+
 def validate(val_loader, model, criterion):
     batch_time = AverageMeter()
     losses     = AverageMeter()
     top1       = AverageMeter()
     top5       = AverageMeter()
 
-    # switch to evaluate mode
     model.eval()
 
     end = time.time()
-    for i, (input, target) in enumerate(val_loader):
-        input      = input.cuda()
-        target     = target.cuda()
-        input_var  = torch.autograd.Variable(input, volatile=True)
-        target_var = torch.autograd.Variable(target, volatile=True)
+    with torch.no_grad():
+        for i, (input, target) in enumerate(val_loader):
+            input  = input.cuda()
+            target = target.cuda()
+            output, _ = model(input)
+            loss = criterion(output, target)
 
-        # compute output
-        output, _ = model(input_var)
-        loss   = criterion(output, target_var)
+            prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+            losses.update(loss.item(), input.size(0))
+            top1.update(prec1[0], input.size(0))
+            top5.update(prec5[0], input.size(0))
 
-        # measure accuracy and record loss
-        prec1, prec5 = accuracy(output.data, target, topk=(1,5))
-        losses.update(loss.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
-        top5.update(prec5[0], input.size(0))
+            batch_time.update(time.time() - end)
+            end = time.time()
 
-
-    print('\nTest set: Average loss: {}, Accuracy: ({})\n'.format(losses.avg, top1.avg))
-
+    print('\nTest set: Average loss: {:.4f}, Accuracy: ({:.3f}%)\n'.format(losses.avg, top1.avg))
     return top1.avg
+
 
 def save_checkpoint(state, filename):
     torch.save(state, filename)
 
 
 class AverageMeter(object):
-    """Computes and stores the average and current value"""
+    """Computes and stores the average and current value."""
     def __init__(self):
         self.reset()
 
@@ -255,27 +262,41 @@ def adjust_learning_rate(optimizer, epoch):
     scale = 0.457305051927326
     step  = 10
     lr = args.lr * (scale ** (epoch // step))
-    print('lr: {}'.format(lr))
-    if (epoch != 0) & (epoch % step == 0):
-        print('Change lr')
+    print('Current lr: {}'.format(lr))
+    if (epoch != 0) and (epoch % step == 0):
+        print('Adjusting learning rate')
         for param_group in optimizer.param_groups:
             param_group['lr'] = param_group['lr'] * scale
 
 
 def accuracy(output, target, topk=(1,)):
-    """Computes the precision@k for the specified values of k"""
+    """Computes the precision@k for the specified values of k."""
     maxk = max(topk)
     batch_size = target.size(0)
 
     _, pred = output.topk(maxk, 1, True, True)
-    pred    = pred.t()
+    pred = pred.t()
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
+        correct_k = correct[:k].reshape(-1).float().sum(0)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
+
+
+def export_standalone_model(model, export_path):
+    """
+    Export the trained model as a TorchScript file.
+    This allows the model to be loaded for inference without the training code.
+    """
+    model.eval()
+    device = next(model.parameters()).device
+    # Create an example input tensor (assuming single-channel 128x128 input)
+    example_input = torch.randn(1, 1, 128, 128).to(device)
+    # Trace the model with the example input
+    traced_model = torch.jit.trace(model, example_input)
+    traced_model.save(export_path)
 
 if __name__ == '__main__':
     main()
