@@ -68,7 +68,9 @@ Perform real-time face recognition from webcam or drone:
 ```bash
 python main.py
 ```
-https://github.com/EagleWingsFYP/Face-detection/issues/1
+
+![Face Recognition Module](Screenshot 2025-02-28 164043.png)
+
 ---
 
 ## 📝 Usage Guide
