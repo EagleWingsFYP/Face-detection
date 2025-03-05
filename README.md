@@ -1,7 +1,3 @@
-Sure! Here's your **extensive README** in complete markdown format.  
-
----
-
 # **Face Recognition Module – EAGLE WINGS**
 
 ## 📌 Overview
