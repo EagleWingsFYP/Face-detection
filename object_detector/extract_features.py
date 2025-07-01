@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 import numpy as np
 import cv2
 import pickle
-from light_cnn import LightCNN_9Layers, LightCNN_29Layers, LightCNN_29Layers_v2
+from .light_cnn import LightCNN_9Layers, LightCNN_29Layers, LightCNN_29Layers_v2
 
 parser = argparse.ArgumentParser(description='PyTorch LightCNN Feature Extraction')
 parser.add_argument('--arch', '-a', metavar='ARCH', default='LightCNN')
@@ -15,9 +15,9 @@ parser.add_argument('--cuda', '-c', default=False, action='store_true', help='Us
 parser.add_argument('--resume', default='F:\Python Project\LightCNN\LightCNN_29Layers_checkpoint.pth', type=str, metavar='PATH',
                     help='Path to the pre-trained checkpoint model')
 parser.add_argument('--model', default='LightCNN-29', type=str, metavar='Model', help='Model type: LightCNN-9, LightCNN-29')
-parser.add_argument('--root_path', default='F:\Python Project\LightCNN\dataset', type=str, metavar='PATH', 
+parser.add_argument('--root_path', default='F:\Python Project\eagle-wings-drone-project\tello\drone_project\data\dataset', type=str, metavar='PATH', 
                     help='Root path of face images.')
-parser.add_argument('--save_path', default='F:\Python Project\LightCNN\extracted_features', type=str, metavar='PATH', 
+parser.add_argument('--save_path', default='F:\Python Project\eagle-wings-drone-project\tello\drone_project\data\extracted_features', type=str, metavar='PATH', 
                     help='Save path for extracted features.')
 parser.add_argument('--num_classes', default=79077, type=int, metavar='N', help='Number of classes for the model.')  # FIXED
 

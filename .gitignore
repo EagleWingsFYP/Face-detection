@@ -70,6 +70,9 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Large model files
+object_detector/LightCNN_29Layers_checkpoint.pth_2
+
 # pyenv
 .python-version
 

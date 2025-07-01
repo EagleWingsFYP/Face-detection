@@ -15,7 +15,7 @@ import torchvision.transforms as transforms
 import numpy as np
 
 # Import the LightCNN model definitions from light_cnn.py
-from light_cnn import LightCNN_9Layers, LightCNN_29Layers, LightCNN_29Layers_v2
+from object_detector.light_cnn import LightCNN_9Layers, LightCNN_29Layers, LightCNN_29Layers_v2
 # Import the ImageList dataset from load_imglist.py
 from load_imglist import ImageList
 
