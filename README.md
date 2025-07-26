@@ -1,159 +1,281 @@
-# **Face Recognition Module – EAGLE WINGS**
+# 🎯 Enhanced Face Detection Module
 
-## 📌 Overview
-The **Face Recognition Module** is an integral part of **EAGLE WINGS**, an AI-powered personal assistant drone. This module enables **real-time face recognition**, allowing the drone to:
-- Identify authorized users
-- Assist in autonomous navigation
-- Enhance security and surveillance
+## Overview
 
-Built using **LightCNN-29**, the system processes video input, extracts facial features, and matches them against a stored database using **cosine similarity** for high-accuracy identification.
+The Face Detection module has been enhanced with robust integration, graceful disconnection handling, and seamless camera switching capabilities. This module now works seamlessly with the main EagleWings system.
 
----
+## 🚀 Key Enhancements
 
-## 🎯 Key Features
-- ✅ **Real-time Face Recognition** using **LightCNN-29**
-- ✅ **High-accuracy Facial Feature Extraction**
-- ✅ **Live Face Detection & Tracking**
-- ✅ **Cosine Similarity Matching for Identification**
-- ✅ **Autonomous Navigation Support for Drones**
-- ✅ **Secure Access & Authentication**
+### **Graceful Disconnection Handling**
+- ✅ **Automatic WebCam Fallback**: Switches to WebCam when drone disconnects
+- ✅ **Connection Monitoring**: Real-time detection of drone disconnection
+- ✅ **Seamless Recovery**: Continues operation without interruption
+- ✅ **Resource Cleanup**: Proper cleanup of camera resources
 
----
+### **Enhanced Integration**
+- ✅ **Shared Tello Instance**: Uses shared drone instance from main system
+- ✅ **Thread-Safe Operations**: Safe integration with main system
+- ✅ **Status Monitoring**: Real-time status reporting
+- ✅ **Error Recovery**: Robust error handling and recovery
 
-## 🏗 System Architecture
-The module follows a **three-step pipeline**:
+## 🔧 Architecture
 
-1️⃣ **Face Detection** – Detect faces using **Haar Cascade Classifier**  
-2️⃣ **Feature Extraction** – Extract deep facial embeddings using **LightCNN-29**  
-3️⃣ **Face Recognition** – Compare extracted features using **cosine similarity**
-
----
-
-## 🛠 Tech Stack
-| Component          | Technology Used |
-|--------------------|----------------|
-| Programming Language | Python |
-| Deep Learning Model | LightCNN-29 |
-| Face Detection | Haar Cascade Classifier |
-| Feature Matching | Cosine Similarity |
-| Dataset | Pre-trained model with custom dataset |
-| Camera Source | Webcam / DJI Tello Drone |
-
----
-
-## 🚀 Installation & Setup
-
-### **1️⃣ Clone the Repository**
-```bash
-git clone https://github.com/your-repo/face-recognition-eaglewings.git
-cd face-recognition-eaglewings
-
-```
-### **2️⃣ Install Dependencies**
-Ensure you have Python **3.8+** installed, then run:
-```bash
-pip install -r requirements.txt
+### **Camera Management**
+```python
+# Automatic camera selection based on drone status
+if tello is not None:
+    if hasattr(tello, '_connected') and tello._connected:
+        camera_type = "TelloCam"  # Use drone camera
+    else:
+        camera_type = "WebCam"    # Fallback to webcam
+else:
+    camera_type = "WebCam"        # No drone available
 ```
 
-### **3️⃣ Run the System**
-
-#### **▶ Face Feature Extraction**
-Extract and save facial embeddings from input images:
-```bash
-python feature_extraction.py --input dataset/
+### **Disconnection Detection**
+```python
+# Real-time connection monitoring
+if camera_type == "TelloCam" and camera is not None:
+    if hasattr(camera, 'is_connected') and not camera.is_connected():
+        # Switch to WebCam automatically
+        camera = WebCam()
+        camera_type = "WebCam"
 ```
 
-#### **▶ Live Face Recognition**
-Perform real-time face recognition from webcam or drone:
-```bash
-python main.py
+## 📡 Integration with Main System
+
+### **Shared Tello Instance**
+```python
+# Main system passes shared Tello instance
+def start_face_detection_shared_tello(shared_tello=None):
+    global tello, camera_type
+    tello = shared_tello
+    
+    # Determine camera type based on drone status
+    if tello is not None:
+        # Check if drone is actually connected
+        try:
+            battery = tello.get_battery()
+            if battery > 0:
+                camera_type = "TelloCam"
+            else:
+                camera_type = "WebCam"
+        except Exception:
+            camera_type = "WebCam"
 ```
 
-![Face Recognition Module](https://raw.githubusercontent.com/EagleWingsFYP/Face-detection/main/Screenshot%202025-02-28%20164043.png)
-
----
-
-## 📝 Usage Guide
-
-### **🔹 Feature Extraction (`feature_extraction.py`)**
-This script processes images and extracts facial features using **LightCNN-29**.
-
-**Usage:**
-```bash
-python feature_extraction.py --input dataset/
+### **Thread-Safe Operation**
+```python
+# Runs in separate thread with proper cleanup
+system.face_detection_thread = threading.Thread(
+    target=start_face_detection_shared_tello,
+    args=(system.tello,),
+    daemon=True,
+    name="FaceDetection"
+)
 ```
-- `--input` → Path to folder containing face images  
 
-### **🔹 Real-Time Face Recognition (`main.py`)**
-This script captures video, detects faces, and recognizes them in real time.
+## 🛠️ Enhanced TelloCam Class
 
-**Usage:**
-```bash
-python main.py --source webcam
+### **Connection Monitoring**
+```python
+class TelloCam:
+    def __init__(self, tello: Tello):
+        self.is_connected = True
+        self.last_frame_time = time.time()
+        self.connection_timeout = 5.0
+        
+    def is_connected(self):
+        """Check if still connected"""
+        return self.is_connected
+        
+    def stop(self):
+        """Graceful cleanup"""
+        self.is_connected = False
+        # Safe streamoff only if connected
 ```
-- `--source` → `"webcam"` or `"drone"` for input source  
+
+### **Automatic Fallback**
+```python
+def frame(self):
+    if not self.is_connected:
+        return np.zeros((720, 960, 3))  # Dummy frame
+        
+    # Check for timeout
+    if time.time() - self.last_frame_time > self.connection_timeout:
+        self.is_connected = False
+        return np.zeros((720, 960, 3))
+```
+
+## 🔄 Camera Switching Flow
+
+### **Scenario 1: Drone Connected**
+```
+1. Main system connects to drone
+2. Face detection uses TelloCam
+3. Real-time face detection with drone camera
+```
+
+### **Scenario 2: Drone Disconnects**
+```
+1. TelloCam detects disconnection
+2. Sets is_connected = False
+3. Main loop detects disconnection
+4. Automatically switches to WebCam
+5. Continues face detection seamlessly
+```
+
+### **Scenario 3: No Drone Available**
+```
+1. System starts with WebCam
+2. Face detection uses WebCam
+3. Full functionality without drone
+```
+
+## 🧪 Testing
+
+### **Run Camera Synchronization Test**
+```bash
+python test_camera_sync.py
+```
+
+### **Expected Output**
+```
+✅ CORRECT: Will use WebCam with failed real tello
+✅ All tests passed! Camera synchronization is working correctly.
+```
+
+### **Run Graceful Disconnection Test**
+```bash
+python test_graceful_disconnect.py
+```
+
+## 📊 Status Monitoring
+
+### **Module Status**
+```python
+# Check if face detection is running
+if system.face_detection_running:
+    print("Face detection is active")
+else:
+    print("Face detection is stopped")
+```
+
+### **Camera Status**
+```python
+# Check current camera type
+print(f"Active camera: {system.active_camera_type}")
+# Output: "Active camera: WebCam" or "Active camera: TelloCam"
+```
+
+## 🔒 Safety Features
+
+### **Resource Cleanup**
+```python
+def tello_shutdown():
+    if tello and hasattr(tello, '_connected') and tello._connected:
+        try:
+            tello.streamoff()
+            tello.land()
+        except Exception as e:
+            print(f"Error during shutdown: {e}")
+```
+
+### **Error Handling**
+```python
+try:
+    camera = TelloCam(tello)
+except Exception as e:
+    print(f"Failed to initialize TelloCam: {e}")
+    camera = WebCam()  # Fallback
+```
+
+## 🎯 Usage Examples
+
+### **Start Face Detection**
+```python
+# Via API endpoint
+POST /start_face_detection
+
+# Response
+{
+    "message": "✅ Face detection started!",
+    "camera_type": "WebCam"
+}
+```
+
+### **Check Status**
+```python
+# Via API endpoint
+GET /status
+
+# Response includes face detection status
+{
+    "modules": {
+        "face_detection": {
+            "running": true,
+            "camera_type": "WebCam"
+        }
+    }
+}
+```
+
+## 🔧 Configuration
+
+### **Environment Variables**
+```env
+# Camera timeout settings
+CAMERA_TIMEOUT=5.0
+FRAME_TIMEOUT=2.0
+
+# Debug settings
+DEBUG=false
+```
+
+### **Camera Settings**
+```python
+# TelloCam settings
+connection_timeout = 5.0  # 5 seconds
+frame_timeout = 2.0       # 2 seconds without valid frame
+
+# WebCam settings
+webcam_source = 0         # Default webcam
+```
+
+## 🚨 Troubleshooting
+
+### **Common Issues**
+
+#### **1. Camera Not Initializing**
+```
+❌ Cannot initialize TelloCam: tello is not connected
+✅ WebCam initialized as fallback
+```
+**Solution**: System automatically falls back to WebCam
+
+#### **2. Disconnection During Operation**
+```
+[run.py] Drone disconnected during operation! Switching to WebCam...
+[run.py] Successfully switched to WebCam
+```
+**Solution**: Automatic recovery - no action needed
+
+#### **3. Module Not Starting**
+```
+[FaceDetection] ❌ Failed to start: ModuleNotFoundError
+```
+**Solution**: Check dependencies and module paths
+
+## 🔮 Future Enhancements
+
+### **Planned Features**
+- **Multi-Camera Support**: Switch between multiple cameras
+- **Advanced Detection**: Enhanced face recognition
+- **Performance Optimization**: Faster detection algorithms
+- **Cloud Integration**: Remote face database lookup
 
 ---
 
-## 🎯 How It Works
-
-### **1️⃣ Face Detection**
-- Uses **Haar Cascade Classifier** to detect faces in live video.
-- Extracts **bounding boxes** for detected faces.
-
-### **2️⃣ Feature Extraction**
-- Passes detected faces through **LightCNN-29** to generate feature embeddings.
-- Saves extracted embeddings in a database for future recognition.
-
-### **3️⃣ Face Recognition**
-- Captures a new face from a live stream.
-- Compares extracted features using **cosine similarity**.
-- Classifies as **"Known"** (if match > threshold) or **"Unknown"**.
-
----
-
-## 🔬 Evaluation & Performance
-| Metric        | Value |
-|--------------|-------|
-| Accuracy     | 95% |
-| False Positives | <2% |
-| Recognition Speed | 30ms per frame |
-| Model Size   | 200MB |
-
-- The model is optimized for **real-time performance**.
-- Recognition speed can be improved with **GPU acceleration**.
-
----
-
-## 🔥 Potential Enhancements
-
-- 🔹 **Optimize Thresholds** – Fine-tune cosine similarity for improved accuracy.
-- 🔹 **GPU Acceleration** – Utilize TensorRT or OpenVINO for speedup.
-- 🔹 **Multi-Face Recognition** – Detect and recognize multiple faces per frame.
-- 🔹 **Drone Integration** – Implement recognition using a DJI Tello EDU drone.
-
----
-
-## 🤖 Role in EAGLE WINGS
-
-✅ **Identity Verification** – Ensures only authorized users can access the drone.  
-✅ **AI-Powered Assistance** – Personalizes drone interactions based on user identity.  
-✅ **Security & Surveillance** – Tracks and recognizes individuals in real time.  
-✅ **Autonomous Navigation** – Enables drone-assisted **person tracking and following**.  
-
----
-
-## 📜 License
-This project is open-source under the **MIT License**.
-
----
-
-## 💡 Contributors
-👨‍💻 **Abdullah Bajwa** – Founder & Lead Developer  
-
----
-
-## 📬 Contact & Support
-📧 **Email:** [bajwa15523@gmail.com](mailto:bajwa15523@gmail.com)  
-🔗 **LinkedIn:** [Abdullah Bajwa](https://www.linkedin.com/in/abdullah--bajwa/)  
-🚀 **GitHub:** [Abdullah007bajwa](https://github.com/Abdullah007bajwa)  
+**Author**: Abdullah Bajwa  
+**Version**: 2.0.0 (Enhanced Integration)  
+**Last Updated**: 2024
