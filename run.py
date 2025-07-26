@@ -221,6 +221,8 @@ def setup():
 
 # Loop
 def loop():
+    global camera_type, camera, controller
+    
     if interface_type == "QT6Interface":
         from PyQt6.QtCore import QTimer
         from config.settings import MAIN_LOOP_RATE
@@ -239,7 +241,6 @@ def loop():
         return
     
     if interface_type == "CV2Interface":
-        global camera_type, camera, controller
         try:
             while not interface.is_closed:
                 # Check for drone disconnection during operation
