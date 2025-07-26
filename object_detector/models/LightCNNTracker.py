@@ -16,7 +16,7 @@ class LightCNNTracker(QObject):
     centerUpdated = pyqtSignal(tuple)    # Emits (x_center, y_center)
     trackingLost = pyqtSignal()          # Emits when tracking is lost
 
-    def __init__(self, interface, 
+    def __init__(self, interface=None, 
                  model_path=os.path.join(os.path.dirname(__file__), '..', 'LightCNN_29Layers_checkpoint.pth_2'), 
                  feature_dir=os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../database/extracted_features')),
                  similarity_threshold=0.7):
@@ -62,7 +62,7 @@ class LightCNNTracker(QObject):
         self.detections = []
 
         # Setup Grid Navigator for movement control
-        self.navigator = GridNavigator(self)
+        self.navigator = GridNavigator(self) if self.interface else None 
 
     def set_object(self):
         """Start tracking using the current boundary and center."""
@@ -134,8 +134,9 @@ class LightCNNTracker(QObject):
             self.boundary = sel["box"]
             self.center = sel["center"]
             self.is_tracking = True
-            self.boundaryUpdated.emit(self.boundary)
-            self.centerUpdated.emit(self.center)
+            if self.interface:
+                self.boundaryUpdated.emit(self.boundary)
+                self.centerUpdated.emit(self.center)
         
         return frame
 
@@ -162,7 +163,8 @@ class LightCNNTracker(QObject):
         self.is_tracking = False
         self.boundary = None
         self.center = None
-        self.trackingLost.emit()
+        if self.interface:
+            self.trackingLost.emit()
 
     def on_frame(self, frame):
         """
@@ -184,5 +186,6 @@ class LightCNNTracker(QObject):
             cv2.line(frame, frame_center, self.center, (255, 0, 0), 2)
         
         # Call navigator logic for movement control
-        self.navigator.navigate(frame)
+        if self.navigator:
+            self.navigator.navigate(frame)
         return frame
