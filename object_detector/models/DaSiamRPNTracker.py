@@ -12,43 +12,31 @@ from config.settings import debug
 
 class DaSiamRPNTracker:
 
-    # 
-    # Config
-    # 
     MODEL_FILE = './dist/SiamRPNOTB.model'
     BORDER_THRESHOLD = 5
     LOST_TIMEOUT = 1.5
 
-    # 
-    # Constructor
-    # 
 
     def __init__(self, interface, draw_boundary=True, draw_point=True, as_submodel=False):
-        # Arguments
         self.interface = interface
         self.draw_boundary = draw_boundary
         self.draw_point = draw_point
         self.as_submodel = as_submodel
 
-        # Config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # State
         self.is_tracking = False
         self.is_lost = False
 
-        # Globals
         self.model = None
         self.target = None
         self.boundary = None
         self.center = False
         self.border_crossed_at = None
 
-        # Colors
         self.boundary_color = 'green'
         self.point_color = 'blue'
 
-        # Setup
         self.initialize_tracker()
 
     def initialize_tracker(self):
@@ -59,9 +47,6 @@ class DaSiamRPNTracker:
         self.model.eval()
 
 
-    # 
-    # Core
-    # 
 
     def set_object(self, boundary=None):
 
@@ -71,12 +56,10 @@ class DaSiamRPNTracker:
         self.is_tracking = True
         self.is_lost = False
 
-        # Boundary and center to initialize
         x, y, w, h = self.boundary
         cx, cy = x + w / 2, y + h / 2
         target_pos, target_sz = np.array([cx, cy]), np.array([w, h])
 
-        # Initialize Target
         self.target = SiamRPN_init(frame, target_pos, target_sz, self.model, self.device)
 
         if not self.as_submodel:
@@ -113,9 +96,6 @@ class DaSiamRPNTracker:
             if self.draw_boundary: self.draw_object_boundary(frame)
             if self.draw_point: self.draw_center_line(frame)
 
-    # 
-    # Helpers
-    # 
 
     def lost(self, frame):
 
@@ -138,9 +118,6 @@ class DaSiamRPNTracker:
         
         return False
 
-    # 
-    # Callbacks
-    # 
 
     def on_lost(self):
         self.is_tracking = False

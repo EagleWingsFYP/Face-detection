@@ -1,16 +1,10 @@
 
-# 
-# Imports
-# 
 
 import sys, os; sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 import cv2
 from config.settings import platform
 
 
-# 
-# get_video_inputs function
-# 
 
 def get_video_inputs():
     video_inputs = {}
@@ -19,7 +13,6 @@ def get_video_inputs():
     if platform == 'Linux':
         import pyudev
 
-        # Use pyudev to get video devices on Linux
         context = pyudev.Context()
         for device in context.list_devices(subsystem='video4linux'):
             if 'ID_VIDEO' in device:
@@ -39,7 +32,6 @@ def get_video_inputs():
 
     else:
         pass
-        # raise NotImplementedError(f"Unsupported platform: {platform}")
 
 
     while index < 10:
@@ -48,7 +40,6 @@ def get_video_inputs():
         if not cap.isOpened():
             break
 
-        # Frame test
         ret, frame = cap.read()
         device = video_inputs.get(index, {'type':  f"Unknown", 'name': f"Camera {index}"})
 

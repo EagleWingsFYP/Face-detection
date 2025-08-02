@@ -5,43 +5,30 @@ import cv2
 from config.settings import debug
 
 
-# 
-# The "CSRTTracker" class
-# 
 
 class CSRTTracker:
 
-    # 
-    # Constructor
-    # 
 
     def __init__(self, interface=None, draw_point=True, draw_boundary=True):
         
-        # Arguments
         self.interface = interface
         self.draw_point = draw_point
         self.draw_boundary = draw_boundary
 
-        # Globals
         self.boundary = None
         self.center = False
         self.boundary_color = 'green'
         self.point_color = 'blue'
 
-        # States
         self.is_tracking = False
         self.is_lost = False
 
-        # Setup
         self.initialize_tracker()
 
     def initialize_tracker(self):
         self.tracker = cv2.TrackerCSRT_create()
         self.is_tracking = False
 
-    # 
-    # Core
-    # 
 
     def set_object(self):
         self.boundary = self.interface.boundary
@@ -79,9 +66,6 @@ class CSRTTracker:
             if self.draw_boundary: self.draw_object_boundary(frame)
             if self.draw_point: self.draw_center_line(frame)
     
-    # 
-    # Callbacks
-    # 
 
     def on_lost(self):
         self.is_tracking = False

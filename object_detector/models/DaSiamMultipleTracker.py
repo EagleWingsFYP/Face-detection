@@ -7,27 +7,20 @@ from .DaSiamRPNTracker import DaSiamRPNTracker
 
 class DaSiamMultipleTracker:
 
-    # 
-    # Constructor
-    # 
 
     def __init__(self, interface, draw_point=True, draw_boundary=True):
 
-        # Arguments
         self.interface = interface
         self.draw_point = draw_point
         self.draw_boundary = draw_boundary
 
-        # Config
         self.number_of_models = 2
         self.distance_threshold = 90
 
-        # States
         self.is_tracking = False
         self.is_lost = False
         self.lost_count = 0
 
-        # Globals
         self.models = [DaSiamRPNTracker(interface, draw_point, draw_boundary, as_submodel=True)] * self.number_of_models
         self.center = False
         self.boundary = None
@@ -37,16 +30,11 @@ class DaSiamMultipleTracker:
         self.boundary_color = 'green'
         self.point_color = 'blue'
 
-    # 
-    # Core
-    # 
 
     def set_object(self):
 
-        # Get Actual Boundary
         x, y, w, h = self.interface.boundary
 
-        # Gen Boundary Copies
         boundaries = [
             [x, y, w, h],       # actual
             [x-25, y+25, w, h], # cupy: up-left
@@ -60,7 +48,6 @@ class DaSiamMultipleTracker:
                 offset_y = random.randint(-30, 30)
                 boundaries.append([x + offset_x, y + offset_y, w, h])
 
-        # Initialize Models
         for i, model in enumerate(self.models):
             model.set_object(boundaries[i])
 
@@ -96,7 +83,6 @@ class DaSiamMultipleTracker:
                 model.get_object_boundary(frame)
                 boundary = model.boundary
 
-                # to see how many lost due to crossing frame boundary
                 if not boundary:
                     self.lost_set.add(i)
                     self.lost_count += 1
@@ -106,7 +92,6 @@ class DaSiamMultipleTracker:
                     self.boundaries.append((i, boundary))
                     self.lost_set.discard(i)
 
-            # to see how many are outliers
             self.check_too_far()
             if self.lost_count > 0:
                 if debug: print("[DBG] lost count", self.lost_count)
@@ -138,9 +123,6 @@ class DaSiamMultipleTracker:
             if self.draw_boundary: self.draw_object_boundary(frame)
             if self.draw_point: self.draw_center_line(frame)
 
-    # 
-    # Callbacks
-    # 
 
     def on_lost(self):
         self.is_tracking = False
@@ -151,9 +133,6 @@ class DaSiamMultipleTracker:
         self.interface.hide_center()
 
 
-    # 
-    # Util
-    # 
 
     def check_too_far(self):
         centers = {}
@@ -170,7 +149,6 @@ class DaSiamMultipleTracker:
                     if distance > self.distance_threshold:
                         far_points += 1
             
-            # If point is far from at least 2 others
             if far_points >= 2:
                 self.lost_set.add(i)
                 self.lost_count += 1

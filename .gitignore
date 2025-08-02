@@ -50,6 +50,7 @@ coverage.xml
 *.mo
 *.pot
 
+temp_auto_push.bat
 # Django stuff:
 *.log
 local_settings.py
@@ -102,3 +103,5 @@ ENV/
 
 # mypy
 .mypy_cache/
+.gitignore
+temp_interactive_push.bat
