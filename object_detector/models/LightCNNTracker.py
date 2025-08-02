@@ -11,7 +11,6 @@ from PyQt6.QtCore import QObject, pyqtSignal
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../database')))
 class LightCNNTracker(QObject):
-    # Signals for UI updates
     boundaryUpdated = pyqtSignal(tuple)  # Emits (x, y, w, h)
     centerUpdated = pyqtSignal(tuple)    # Emits (x_center, y_center)
     trackingLost = pyqtSignal()          # Emits when tracking is lost
@@ -29,7 +28,6 @@ class LightCNNTracker(QObject):
         self.interface = interface
         self.similarity_threshold = similarity_threshold
 
-        # Load the pre-trained LightCNN model
         self.model = LightCNN_29Layers(num_classes=79077)
         checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
         state_dict = checkpoint['state_dict']
@@ -37,7 +35,6 @@ class LightCNNTracker(QObject):
         self.model.load_state_dict(state_dict)
         self.model.eval()
 
-        # Load feature database: {person_name: [feature_vectors]}
         self.feature_db = {}
         for folder in os.listdir(feature_dir):
             person_dir = os.path.join(feature_dir, folder)
@@ -49,19 +46,15 @@ class LightCNNTracker(QObject):
                             feature = pickle.load(f)
                             self.feature_db[folder].append(feature)
 
-        # Preprocessing transformation and face detector
         self.transform = transforms.Compose([transforms.ToTensor()])
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-        # Tracking state initialization
         self.boundary = None  # (x, y, w, h)
         self.center = None    # (x_center, y_center)
         self.is_tracking = False
 
-        # Store detections for potential face selection
         self.detections = []
 
-        # Setup Grid Navigator for movement control
         self.navigator = GridNavigator(self) if self.interface else None 
 
     def set_object(self):
@@ -78,7 +71,6 @@ class LightCNNTracker(QObject):
         img_tensor = self.transform(resized).unsqueeze(0)  # Add batch dimension
         with torch.no_grad():
             features = self.model(img_tensor)
-        # Assuming the second output contains the desired feature vector
         return features[1].data.cpu().numpy()[0]
 
     def recognize_face(self, frame):
@@ -95,14 +87,12 @@ class LightCNNTracker(QObject):
             self.on_lost()
             return frame
 
-        # Process each detected face
         for (x, y, w, h) in faces:
             face_img = frame[y:y+h, x:x+w]
             features = self.extract_face_features(face_img)
             
             best_match = "Unknown"
             best_similarity = float('inf')
-            # Compare against each feature in the database
             for person_name, db_features in self.feature_db.items():
                 for db_feat in db_features:
                     similarity = cosine(features, db_feat)
@@ -110,7 +100,6 @@ class LightCNNTracker(QObject):
                         best_similarity = similarity
                         best_match = person_name
 
-            # Use threshold to determine if recognition is confident
             if best_similarity >= self.similarity_threshold:
                 best_match = "Unknown"
 
@@ -124,11 +113,9 @@ class LightCNNTracker(QObject):
             }
             self.detections.append(detection)
 
-            # Annotate the frame with bounding box and label
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv2.putText(frame, best_match, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
-        # Auto-select if only one face is detected
         if len(self.detections) == 1:
             sel = self.detections[0]
             self.boundary = sel["box"]
@@ -179,13 +166,10 @@ class LightCNNTracker(QObject):
         if self.is_tracking and self.center is not None:
             frame_h, frame_w = frame.shape[:2]
             frame_center = (frame_w // 2, frame_h // 2)
-            # Draw frame center lines
             cv2.line(frame, (frame_center[0], 0), (frame_center[0], frame_h), (0, 255, 0), 1)
             cv2.line(frame, (0, frame_center[1]), (frame_w, frame_center[1]), (0, 255, 0), 1)
-            # Draw line from frame center to target center
             cv2.line(frame, frame_center, self.center, (255, 0, 0), 2)
         
-        # Call navigator logic for movement control
         if self.navigator:
             self.navigator.navigate(frame)
         return frame

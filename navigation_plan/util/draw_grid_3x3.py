@@ -41,14 +41,11 @@ def highlight_cell(frame, cell=(1, 1), center_cell_size=(100,100), alpha=0.5):
         [(side_w + center_w, side_h + center_h), (frame_width, frame_height)]  # Bottom-right
     ]
     
-    # Get the cell coordinates to highlight based on the index (row, col)
     top_left, bottom_right = cells[cell[1] + 3 * cell[0]]  # Flatten the 3x3 grid into 1D list
 
-    # Create an overlay for semi-transparency
     overlay = frame.copy()
     cv2.rectangle(overlay, top_left, bottom_right, (255, 255, 255), -1)
 
-    # Apply the overlay with alpha blending
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
     return frame
