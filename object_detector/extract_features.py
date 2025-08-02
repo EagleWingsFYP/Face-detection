@@ -42,7 +42,6 @@ def save_feature(save_path, person_name, img_name, features):
 def main():
     args = parser.parse_args()
 
-    # Load the model
     if args.model == 'LightCNN-9':
         model = LightCNN_9Layers(num_classes=args.num_classes)
     elif args.model == 'LightCNN-29':
@@ -52,7 +51,6 @@ def main():
     else:
         raise ValueError(f"Invalid model type: {args.model}")
 
-    # Load checkpoint
     if os.path.isfile(args.resume):
         print(f"Loading checkpoint from '{args.resume}'")
         checkpoint = torch.load(args.resume, map_location=torch.device('cpu'))
@@ -63,7 +61,6 @@ def main():
 
     model.eval()
 
-    # Traverse through dataset folders
     for person_name in os.listdir(args.root_path):
         person_path = os.path.join(args.root_path, person_name)
         if not os.path.isdir(person_path):  # Skip files

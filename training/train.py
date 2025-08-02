@@ -14,9 +14,7 @@ import torchvision.transforms as transforms
 
 import numpy as np
 
-# Import the LightCNN model definitions from light_cnn.py
 from object_detector.light_cnn import LightCNN_9Layers, LightCNN_29Layers, LightCNN_29Layers_v2
-# Import the ImageList dataset from load_imglist.py
 from load_imglist import ImageList
 
 parser = argparse.ArgumentParser(description='PyTorch Light CNN Training')
@@ -53,7 +51,6 @@ parser.add_argument('--save_path', default='', type=str, metavar='PATH',
 parser.add_argument('--num_classes', default=99891, type=int,
                     metavar='N', help='number of classes (default: 99891)')
 
-# New arguments for exporting a standalone model
 parser.add_argument('--export', action='store_true',
                     help='Export model as a standalone TorchScript model for inference')
 parser.add_argument('--export_path', default='standalone_model.pt', type=str,
@@ -63,7 +60,6 @@ def main():
     global args
     args = parser.parse_args()
 
-    # Create the LightCNN model for face recognition
     if args.model == 'LightCNN-9':
         model = LightCNN_9Layers(num_classes=args.num_classes)
     elif args.model == 'LightCNN-29':
@@ -81,7 +77,6 @@ def main():
 
     print(model)
 
-    # Setup optimizer with adjusted learning rates for different parameter groups
     params = []
     for name, value in model.named_parameters():
         if 'bias' in name:
@@ -99,7 +94,6 @@ def main():
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
 
-    # Optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
@@ -113,7 +107,6 @@ def main():
 
     cudnn.benchmark = True
 
-    # Load datasets using the ImageList class from load_imglist.py
     train_loader = torch.utils.data.DataLoader(
         ImageList(root=args.root_path, fileList=args.train_list, 
                   transform=transforms.Compose([ 
@@ -133,22 +126,17 @@ def main():
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)   
 
-    # Define loss function
     criterion = nn.CrossEntropyLoss()
     if args.cuda:
         criterion = criterion.cuda()
 
-    # Evaluate before training
     validate(val_loader, model, criterion)    
 
-    # Main training loop
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch)
 
-        # Train for one epoch
         train(train_loader, model, criterion, optimizer, epoch)
 
-        # Evaluate on the validation set
         prec1 = validate(val_loader, model, criterion)
 
         save_name = os.path.join(args.save_path, 'lightCNN_' + str(epoch+1) + '_checkpoint.pth.tar')
@@ -159,7 +147,6 @@ def main():
             'prec1': prec1,
         }, save_name)
 
-    # Export the standalone model if requested
     if args.export:
         export_standalone_model(model, args.export_path)
         print("Standalone model exported to {}".format(args.export_path))
@@ -180,11 +167,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         input  = input.cuda()
         target = target.cuda()
-        # Compute output and loss
         output, _ = model(input)
         loss = criterion(output, target)
 
-        # Measure accuracy and record loss
         prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
         losses.update(loss.item(), input.size(0))
         top1.update(prec1[0], input.size(0))
@@ -292,9 +277,7 @@ def export_standalone_model(model, export_path):
     """
     model.eval()
     device = next(model.parameters()).device
-    # Create an example input tensor (assuming single-channel 128x128 input)
     example_input = torch.randn(1, 1, 128, 128).to(device)
-    # Trace the model with the example input
     traced_model = torch.jit.trace(model, example_input)
     traced_model.save(export_path)
 

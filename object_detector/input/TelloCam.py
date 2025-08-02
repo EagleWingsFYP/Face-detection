@@ -9,11 +9,18 @@ class TelloCam:
         self.frame_read = None
         self.is_connected = True
         self.last_frame_time = time.time()
-        self.connection_timeout = 5.0  # 5 seconds timeout
+        self.connection_timeout = 30.0  # Increased to 30 seconds timeout
         
         try:
             self.frame_read = tello.get_frame_read()
             print("[TelloCam] Successfully initialized frame reader")
+            
+            test_frame = self.frame_read.frame
+            if test_frame is not None:
+                print("[TelloCam] Connection test successful - frame received")
+            else:
+                print("[TelloCam] Warning: No initial frame received, but continuing...")
+                
         except Exception as e:
             print(f"[TelloCam] Failed to initialize frame reader: {e}")
             self.frame_read = None
@@ -22,12 +29,10 @@ class TelloCam:
     def frame(self):
         frame = np.zeros((720, 960, 3), dtype=np.uint8)
         
-        # Check if we're still connected
         if not self.is_connected:
             return frame
             
         try:
-            # Check for connection timeout
             current_time = time.time()
             if current_time - self.last_frame_time > self.connection_timeout:
                 print("[TelloCam] Connection timeout detected")
@@ -44,9 +49,8 @@ class TelloCam:
                 self.last_frame_time = current_time  # Update last successful frame time
             else:
                 print("[TelloCam] Received None frame")
-                # Check if we should mark as disconnected
-                if current_time - self.last_frame_time > 2.0:  # 2 seconds without valid frame
-                    print("[TelloCam] No valid frames received, marking as disconnected")
+                if current_time - self.last_frame_time > 10.0:  # 10 seconds without valid frame
+                    print("[TelloCam] No valid frames received for 10 seconds, marking as disconnected")
                     self.is_connected = False
                     
         except Exception as e:
@@ -62,15 +66,12 @@ class TelloCam:
         
         try:
             if self.tello is not None:
-                # Only try to stop stream if we're actually connected
                 try:
-                    # Check if tello is still responsive
                     if hasattr(self.tello, '_connected') and self.tello._connected:
                         print("[TelloCam] Stopping Tello stream...")
                         self.tello.streamoff()
                 except Exception as e:
                     print(f"[TelloCam] Error stopping stream: {e}")
-                    # Don't raise - this is expected when drone is disconnected
         except Exception as e:
             print(f"[TelloCam] Error in stop(): {e}")
         
@@ -87,16 +88,16 @@ class TelloCam:
             return False
             
         try:
-            # Try to get battery level as a connection test
             if hasattr(self.tello, 'get_battery'):
                 battery = self.tello.get_battery()
                 if battery > 0:
+                    print(f"[TelloCam] Connection test passed - battery: {battery}%")
                     return True
                 else:
                     print("[TelloCam] Battery test failed - drone disconnected")
                     return False
         except Exception as e:
             print(f"[TelloCam] Connection test failed: {e}")
-            return False
+            return self.is_connected  # Return current state instead of False
         
         return False
