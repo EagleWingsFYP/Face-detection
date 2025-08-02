@@ -10,7 +10,6 @@ import pickle
 import time
 from navigation_plan.navigators.GridNavigator import GridNavigator
 
-# Load pre-trained model (LightCNN)
 model = LightCNN_29Layers(num_classes=79077)
 checkpoint = torch.load('F:\EagleWingsSystem\EagleWings\modules\faceDetection\object_detector\LightCNN_29Layers_checkpoint.pth_2', map_location=torch.device('cpu'))
 state_dict = checkpoint['state_dict']
@@ -18,7 +17,6 @@ state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
 model.load_state_dict(state_dict)
 model.eval()
 
-# Load feature database
 feature_db = {}  # {person_name: [feature_vectors]}
 feature_dir = 'drone_project/data/extracted_features/'
 
@@ -32,7 +30,6 @@ for folder in os.listdir(feature_dir):
                     feature = pickle.load(f)
                     feature_db[folder].append(feature)
 
-# Preprocessing function
 transform = transforms.Compose([transforms.ToTensor()])
 
 def extract_face_features(img):
@@ -44,7 +41,6 @@ def extract_face_features(img):
         features = model(img_tensor)
     return features[1].data.cpu().numpy()[0]
 
-# Face detection using Haar Cascade
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 class FaceTracker:
@@ -95,7 +91,6 @@ class FaceTracker:
         self.is_tracking = True
         self.is_lost = False
 
-        # Draw bounding boxes and centerlines
         for i, (x, y, w, h) in enumerate(face_coords):
             label = best_matches[i]
             self.boundary = (x, y, w, h)
@@ -122,7 +117,6 @@ class FaceTracker:
         self.boundary = None
         self.center = None
 
-# Real-time face tracking
 tracker = FaceTracker()
 cap = cv2.VideoCapture(0)
 
